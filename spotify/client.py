@@ -38,3 +38,28 @@ def current_playing() -> dict[str, Any] | None:
         return client.current_user_playing_track()
     except (SpotifyException, RuntimeError):
         return None
+
+
+def artist_image_urls(artist_ids: list[str]) -> dict[str, str]:
+    valid_ids = [artist_id for artist_id in artist_ids if artist_id and not artist_id.startswith("art_")]
+    if not valid_ids:
+        return {}
+
+    try:
+        client = get_spotify_client()
+    except RuntimeError:
+        return {}
+
+    image_by_artist: dict[str, str] = {}
+    for i in range(0, len(valid_ids), 50):
+        batch = valid_ids[i : i + 50]
+        try:
+            payload = client.artists(batch)
+        except SpotifyException:
+            continue
+        for artist in payload.get("artists", []):
+            artist_id = artist.get("id")
+            images = artist.get("images") or []
+            if artist_id and images:
+                image_by_artist[artist_id] = images[0].get("url", "")
+    return {k: v for k, v in image_by_artist.items() if v}

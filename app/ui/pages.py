@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date
 
 import pandas as pd
 import plotly.express as px
@@ -19,7 +19,6 @@ from app.ui.settings import render_settings_page
 from db.repository import (
     Pagination,
     album_daily_trend,
-    artist_daily_trend,
     daily_minutes,
     genre_evolution,
     get_kpis,
@@ -40,6 +39,7 @@ from db.repository import (
     top_songs,
     weekday_weekend,
 )
+from spotify.client import artist_image_urls
 from spotify.client import current_playing
 
 
@@ -65,6 +65,11 @@ def _cached_top(start: date, end: date) -> tuple[pd.DataFrame, pd.DataFrame]:
 @st.cache_data(ttl=15)
 def _cached_now_playing() -> dict | None:
     return current_playing()
+
+
+@st.cache_data(ttl=3600)
+def _cached_artist_images(artist_ids: tuple[str, ...]) -> dict[str, str]:
+    return artist_image_urls(list(artist_ids))
 
 
 def render_page(page_key: str, date_range: DateRange) -> None:
@@ -305,12 +310,31 @@ def _render_artists(date_range: DateRange) -> None:
     if df.empty:
         empty_state("No artist results.")
         return
-    st.dataframe(df, use_container_width=True)
-    selected = st.selectbox("Artist drill-down", options=df["id"].tolist(), format_func=lambda x: df[df["id"] == x]["name"].iloc[0])
-    trend = artist_daily_trend(selected, _to_analytics_range(date_range))
-    if not trend.empty:
-        fig = px.line(trend, x="day", y="minutes", markers=True, title="Artist trend over time")
-        st.plotly_chart(fig, use_container_width=True)
+
+    image_urls = _cached_artist_images(tuple(df["id"].astype(str).tolist()))
+    now = pd.Timestamp.now(tz=UTC)
+
+    cols = st.columns(3)
+    for idx, row in enumerate(df.itertuples(index=False), start=0):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                image_url = image_urls.get(str(row.id), "")
+                if image_url:
+                    st.image(image_url, use_container_width=True)
+                else:
+                    st.markdown("### 🎤")
+                st.markdown(f"**{row.name}**")
+
+                last_played = pd.to_datetime(row.last_played, utc=True, errors="coerce")
+                if pd.isna(last_played):
+                    days_ago_text = "Last played: unknown"
+                else:
+                    days_ago = max(0, int((now - last_played).days))
+                    days_ago_text = f"Last played: {days_ago} days ago"
+
+                st.caption(days_ago_text)
+                st.write(f"Plays: **{int(row.plays)}**")
+                st.write(f"Hours played: **{float(row.minutes) / 60:.1f} h**")
 
 
 def _render_songs(date_range: DateRange) -> None:
