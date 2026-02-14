@@ -40,10 +40,8 @@ def current_playing() -> dict[str, Any] | None:
         return None
 
 
-def artist_image_urls(artist_ids: list[str]) -> dict[str, str]:
-    valid_ids = [artist_id for artist_id in artist_ids if artist_id and not artist_id.startswith("art_")]
-    if not valid_ids:
-        return {}
+def artist_image_urls(artists: list[tuple[str, str]]) -> dict[str, str]:
+    valid_ids = [artist_id for artist_id, _ in artists if artist_id and not artist_id.startswith("art_")]
 
     try:
         client = get_spotify_client()
@@ -62,4 +60,19 @@ def artist_image_urls(artist_ids: list[str]) -> dict[str, str]:
             images = artist.get("images") or []
             if artist_id and images:
                 image_by_artist[artist_id] = images[0].get("url", "")
+
+    for artist_id, artist_name in artists:
+        if not artist_name or artist_id in image_by_artist:
+            continue
+        try:
+            result = client.search(q=f"artist:{artist_name}", type="artist", limit=1)
+            items = result.get("artists", {}).get("items", [])
+            if not items:
+                continue
+            images = items[0].get("images") or []
+            if images:
+                image_by_artist[artist_id] = images[0].get("url", "")
+        except SpotifyException:
+            continue
+
     return {k: v for k, v in image_by_artist.items() if v}

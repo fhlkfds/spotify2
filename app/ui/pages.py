@@ -19,6 +19,7 @@ from app.ui.settings import render_settings_page
 from db.repository import (
     Pagination,
     album_daily_trend,
+    artist_daily_trend,
     daily_minutes,
     genre_evolution,
     get_kpis,
@@ -68,8 +69,8 @@ def _cached_now_playing() -> dict | None:
 
 
 @st.cache_data(ttl=3600)
-def _cached_artist_images(artist_ids: tuple[str, ...]) -> dict[str, str]:
-    return artist_image_urls(list(artist_ids))
+def _cached_artist_images(artists: tuple[tuple[str, str], ...]) -> dict[str, str]:
+    return artist_image_urls(list(artists))
 
 
 def render_page(page_key: str, date_range: DateRange) -> None:
@@ -334,7 +335,8 @@ def _render_artists(date_range: DateRange) -> None:
         empty_state("No artist results.")
         return
 
-    image_urls = _cached_artist_images(tuple(df["id"].astype(str).tolist()))
+    artist_refs = tuple((str(row.id), str(row.name)) for row in df.itertuples(index=False))
+    image_urls = _cached_artist_images(artist_refs)
     now = pd.Timestamp.now(tz=UTC)
     selected_key = "library_artists_selected"
     artist_ids = df["id"].astype(str).tolist()
@@ -347,9 +349,9 @@ def _render_artists(date_range: DateRange) -> None:
             with st.container(border=True):
                 image_url = image_urls.get(str(row.id), "")
                 if image_url:
-                    st.image(image_url, use_container_width=True)
+                    st.image(image_url, width="stretch")
                 else:
-                    st.markdown("### 🎤")
+                    st.caption("Image unavailable")
                 st.markdown(f"**{row.name}**")
 
                 last_played = pd.to_datetime(row.last_played, utc=True, errors="coerce")
