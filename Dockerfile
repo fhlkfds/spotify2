@@ -1,7 +1,8 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
@@ -13,7 +14,8 @@ COPY db ./db
 COPY spotify ./spotify
 COPY exports ./exports
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-compile --no-build-isolation . \
+    && find /usr/local -type d -name "__pycache__" -prune -exec rm -rf {} +
 
 EXPOSE 8501
 
