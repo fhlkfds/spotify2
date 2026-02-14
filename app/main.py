@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
-
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -16,32 +14,46 @@ from app.ui.date_filter import (
     preset_options,
 )
 from app.ui.pages import render_page
+from app.ui.theme import apply_theme
 
 
 st.set_page_config(page_title="Spotify Stats", page_icon="🎧", layout="wide")
 load_dotenv()
 init_state(st.session_state)
+apply_theme()
 
 with st.sidebar:
-    st.header("Spotify Stats")
-    st.caption("Reference-style navigation and global filters")
+    st.markdown(
+        """
+        <div class="brand-block">
+          <div class="brand-kicker">Listening Analytics</div>
+          <div class="brand-title">Spotify Stats</div>
+          <div class="brand-sub">Global filters and dashboards</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    grouped_pages: dict[str, list] = defaultdict(list)
-    for page in PAGES:
-        grouped_pages[page.group].append(page)
+    page_by_key = {page.key: page for page in PAGES}
+    page_keys = [page.key for page in PAGES]
+    current_page = st.session_state.get(PAGE_STATE_KEY, page_keys[0])
+    if current_page not in page_by_key:
+        current_page = page_keys[0]
 
-    for group, pages in grouped_pages.items():
-        st.markdown(f"**{group}**")
-        for page in pages:
-            if st.button(page.label, use_container_width=True, key=f"nav_{page.key}"):
-                st.session_state[PAGE_STATE_KEY] = page.key
+    selected_page = st.selectbox(
+        "Navigate",
+        options=page_keys,
+        index=page_keys.index(current_page),
+        format_func=lambda key: f"{page_by_key[key].group} · {page_by_key[key].label}",
+    )
+    st.session_state[PAGE_STATE_KEY] = selected_page
 
     st.divider()
-    st.markdown("**Global date filter**")
+    st.markdown("**Date range**")
     quick_presets = [p for p in PRESETS if p.key != "custom"]
-    quick_cols = st.columns(3)
+    quick_cols = st.columns(2)
     for idx, preset in enumerate(quick_presets):
-        with quick_cols[idx % 3]:
+        with quick_cols[idx % 2]:
             if st.button(preset.label, key=f"preset_{preset.key}", use_container_width=True):
                 st.session_state[DATE_PRESET_STATE_KEY] = preset.key
                 st.session_state[DATE_RANGE_STATE_KEY] = date_range_from_preset(preset.key)

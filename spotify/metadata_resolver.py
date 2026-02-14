@@ -7,11 +7,11 @@ from spotipy.exceptions import SpotifyException
 from spotify.client import get_spotify_client
 
 
-def search_track_id(track_name: str, artist_name: str) -> str | None:
+def search_track_id(track_name: str, artist_name: str, client: Any | None = None) -> str | None:
     query = f"track:{track_name} artist:{artist_name}"
     try:
-        client = get_spotify_client()
-        result = client.search(q=query, type="track", limit=1)
+        spotify_client = client or get_spotify_client()
+        result = spotify_client.search(q=query, type="track", limit=1)
     except (SpotifyException, RuntimeError):
         return None
 

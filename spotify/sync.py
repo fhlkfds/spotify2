@@ -195,6 +195,11 @@ def import_extended_history_file(path: str) -> int:
 
     inserted = 0
     touched_days: set[datetime.date] = set()
+    spotify_client = None
+    try:
+        spotify_client = get_spotify_client()
+    except RuntimeError:
+        spotify_client = None
 
     with SessionLocal() as session:
         for item in data:
@@ -208,7 +213,7 @@ def import_extended_history_file(path: str) -> int:
             uri = item.get("spotify_track_uri")
             track_id = uri.split(":")[-1] if uri else None
             if not track_id:
-                resolved = search_track_id(track_name, artist_name)
+                resolved = search_track_id(track_name, artist_name, client=spotify_client)
                 track_id = resolved or _synthetic_track_id(track_name, artist_name, album_name)
 
             album_id = f"alb_{hashlib.sha1(album_name.encode('utf-8')).hexdigest()[:16]}"
