@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:////data/spotify_stats.db
+    ports:
+      - "8501:8501"
+    volumes:
+      - spotify2_data:/data
+    restart: unless-stopped
+
+volumes:
+  spotify2_data:

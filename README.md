@@ -83,6 +83,39 @@ make test
 make lint
 ```
 
+## Run with Docker Compose
+
+1. Create env file
+```bash
+cp .env.example .env
+```
+
+2. Set required env vars in `.env`
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
+- `SPOTIFY_REDIRECT_URI` (usually `http://localhost:8501`)
+- `FERNET_KEY`
+
+Generate `FERNET_KEY`:
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+3. Build and run
+```bash
+docker compose up --build
+```
+
+Shortcut:
+```bash
+./start.sh
+```
+
+4. Open app
+- `http://localhost:8501`
+
+The SQLite database is persisted in the named Docker volume `spotify2_data`.
+
 ## Repository layout
 - `app/` Streamlit app, navigation, page rendering, global filter
 - `db/` SQLAlchemy models/session/repository/migrations
