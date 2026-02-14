@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -39,14 +41,30 @@ with st.sidebar:
     current_page = st.session_state.get(PAGE_STATE_KEY, page_keys[0])
     if current_page not in page_by_key:
         current_page = page_keys[0]
+    st.session_state[PAGE_STATE_KEY] = current_page
 
-    selected_page = st.selectbox(
-        "Navigate",
-        options=page_keys,
-        index=page_keys.index(current_page),
-        format_func=lambda key: f"{page_by_key[key].group} · {page_by_key[key].label}",
-    )
-    st.session_state[PAGE_STATE_KEY] = selected_page
+    grouped_pages: dict[str, list] = defaultdict(list)
+    for page in PAGES:
+        grouped_pages[page.group].append(page)
+
+    group_order = ["Core", "Library", "Analytics", "Highlights", "System"]
+    current_group = page_by_key[current_page].group
+
+    st.markdown("**Navigate**")
+    for group in group_order:
+        pages = grouped_pages.get(group, [])
+        if not pages:
+            continue
+        with st.expander(group, expanded=group == current_group):
+            for page in pages:
+                is_active = page.key == st.session_state[PAGE_STATE_KEY]
+                if st.button(
+                    page.label,
+                    key=f"nav_{page.key}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary",
+                ):
+                    st.session_state[PAGE_STATE_KEY] = page.key
 
     st.divider()
     st.markdown("**Date range**")

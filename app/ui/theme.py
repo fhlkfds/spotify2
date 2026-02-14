@@ -15,9 +15,40 @@ def apply_theme() -> None:
             --text-main: #122019;
             --text-soft: #4a6153;
             --accent: #1db954;
-            --accent-2: #0f8f40;
             --ring: rgba(29, 185, 84, 0.25);
             --card-shadow: 0 8px 24px rgba(20, 42, 28, 0.09);
+            --sidebar-bg-top: #0f1f19;
+            --sidebar-bg-bottom: #152921;
+            --sidebar-text: #eef7f1;
+            --sidebar-muted: #c5dece;
+          }
+
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --bg-main: #0d1511;
+              --bg-panel: #101c16;
+              --text-main: #e9f4ed;
+              --text-soft: #b8d0c0;
+              --ring: rgba(29, 185, 84, 0.35);
+              --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+              --sidebar-bg-top: #07110d;
+              --sidebar-bg-bottom: #0e1a15;
+              --sidebar-text: #edf7f1;
+              --sidebar-muted: #bdd6c6;
+            }
+          }
+
+          html[data-theme="dark"], body[data-theme="dark"], .stApp[data-theme="dark"] {
+            --bg-main: #0d1511;
+            --bg-panel: #101c16;
+            --text-main: #e9f4ed;
+            --text-soft: #b8d0c0;
+            --ring: rgba(29, 185, 84, 0.35);
+            --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+            --sidebar-bg-top: #07110d;
+            --sidebar-bg-bottom: #0e1a15;
+            --sidebar-text: #edf7f1;
+            --sidebar-muted: #bdd6c6;
           }
 
           .stApp {
@@ -35,11 +66,8 @@ def apply_theme() -> None:
           }
 
           [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0f1f19 0%, #152921 100%);
-          }
-
-          [data-testid="stSidebar"] * {
-            color: #eef7f1;
+            background: linear-gradient(180deg, var(--sidebar-bg-top) 0%, var(--sidebar-bg-bottom) 100%);
+            border-right: 1px solid rgba(171, 213, 186, 0.22);
           }
 
           .brand-block {
@@ -49,6 +77,7 @@ def apply_theme() -> None:
             border: 1px solid rgba(188, 248, 206, 0.2);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
             margin-bottom: 0.7rem;
+            color: var(--sidebar-text);
           }
 
           .brand-kicker {
@@ -56,6 +85,7 @@ def apply_theme() -> None:
             text-transform: uppercase;
             letter-spacing: 0.09em;
             opacity: 0.82;
+            color: var(--sidebar-muted);
           }
 
           .brand-title {
@@ -63,12 +93,48 @@ def apply_theme() -> None:
             font-size: 1.14rem;
             font-weight: 700;
             margin-top: 0.1rem;
+            color: var(--sidebar-text);
           }
 
           .brand-sub {
             opacity: 0.88;
             margin-top: 0.2rem;
             font-size: 0.88rem;
+            color: var(--sidebar-muted);
+          }
+
+          [data-testid="stSidebar"] .stMarkdown p,
+          [data-testid="stSidebar"] label,
+          [data-testid="stSidebar"] [data-testid="stExpander"] summary,
+          [data-testid="stSidebar"] [data-testid="stExpander"] summary p {
+            color: var(--sidebar-text);
+          }
+
+          [data-testid="stSidebar"] [data-testid="stExpander"] {
+            border: 1px solid rgba(173, 216, 188, 0.24);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            margin-bottom: 0.45rem;
+          }
+
+          [data-testid="stSidebar"] .stButton button {
+            border-radius: 10px;
+            border: 1px solid rgba(173, 216, 188, 0.28);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--sidebar-text);
+            box-shadow: none;
+          }
+
+          [data-testid="stSidebar"] .stButton button:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--ring);
+            background: rgba(29, 185, 84, 0.12);
+          }
+
+          [data-testid="stSidebar"] .stButton button[kind="primary"] {
+            background: linear-gradient(135deg, #1aa94d, #169643);
+            border-color: #1aa94d;
+            color: #f7fff9;
           }
 
           [data-testid="stMetric"] {
