@@ -97,7 +97,7 @@ def get_spotify_oauth(state: str | None = None) -> SpotifyOAuth:
 
 def build_authorize_url(state: str) -> str:
     oauth = get_spotify_oauth(state=state)
-    return oauth.get_authorize_url(state=state, show_dialog=False)
+    return oauth.get_authorize_url(state=state)
 
 
 def generate_state_token() -> str:
