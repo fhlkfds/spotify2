@@ -285,34 +285,61 @@ def _render_obsessed(date_range: DateRange) -> None:
 
 def _render_playlists(date_range: DateRange) -> None:
     st.title("Playlists")
-    st.caption("Search playlists and inspect snapshot tracks.")
-    search = st.text_input("Search playlists")
-    df = playlists(search=search)
+    st.caption("Pick a playlist card to see stats.")
+    df = playlists()
     if df.empty:
         empty_state("No playlists found. Sync playlists from Spotify in Settings.")
         return
 
-    st.dataframe(df, use_container_width=True)
-    selected = st.selectbox("Select playlist", options=df["id"].tolist(), format_func=lambda x: df[df["id"] == x]["name"].iloc[0])
+    selected_key = "library_playlists_selected"
+    playlist_ids = df["id"].astype(str).tolist()
+    if st.session_state.get(selected_key) not in playlist_ids:
+        st.session_state[selected_key] = playlist_ids[0]
+
+    cols = st.columns(3)
+    for idx, row in enumerate(df.itertuples(index=False), start=0):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{row.name}**")
+                st.caption(f"Owner: {row.owner or 'Unknown'}")
+                st.caption(f"Snapshot: {row.snapshot_at or 'N/A'}")
+                if st.button("View stats", key=f"playlist_card_{row.id}", use_container_width=True):
+                    st.session_state[selected_key] = str(row.id)
+
+    selected = st.session_state[selected_key]
     tracks_df = playlist_tracks(selected)
-    st.subheader("Playlist snapshot tracks")
+    selected_name = df[df["id"] == selected]["name"].iloc[0]
+    st.subheader(f"Playlist stats: {selected_name}")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Tracks in snapshot", f"{len(tracks_df)}")
+    with c2:
+        unique_albums = int(tracks_df["album_name"].nunique()) if not tracks_df.empty else 0
+        st.metric("Unique albums", f"{unique_albums}")
+
     if tracks_df.empty:
         empty_state("No track snapshot data for this playlist.")
     else:
-        st.dataframe(tracks_df, use_container_width=True)
+        st.caption("Recent tracks in this snapshot")
+        for row in tracks_df.head(12).itertuples(index=False):
+            st.write(f"- **{row.name}** · {row.album_name or 'Unknown album'}")
 
 
 def _render_artists(date_range: DateRange) -> None:
     st.title("Artists")
-    query = st.text_input("Search artists")
+    st.caption("Pick an artist card to see detailed stats.")
     page = st.number_input("Page", min_value=1, value=1, step=1)
-    df = top_artists(_to_analytics_range(date_range), search=query, pagination=Pagination(limit=50, offset=(page - 1) * 50))
+    df = top_artists(_to_analytics_range(date_range), pagination=Pagination(limit=60, offset=(page - 1) * 60))
     if df.empty:
         empty_state("No artist results.")
         return
 
     image_urls = _cached_artist_images(tuple(df["id"].astype(str).tolist()))
     now = pd.Timestamp.now(tz=UTC)
+    selected_key = "library_artists_selected"
+    artist_ids = df["id"].astype(str).tolist()
+    if st.session_state.get(selected_key) not in artist_ids:
+        st.session_state[selected_key] = artist_ids[0]
 
     cols = st.columns(3)
     for idx, row in enumerate(df.itertuples(index=False), start=0):
@@ -335,18 +362,69 @@ def _render_artists(date_range: DateRange) -> None:
                 st.caption(days_ago_text)
                 st.write(f"Plays: **{int(row.plays)}**")
                 st.write(f"Hours played: **{float(row.minutes) / 60:.1f} h**")
+                if st.button("View stats", key=f"artist_card_{row.id}", use_container_width=True):
+                    st.session_state[selected_key] = str(row.id)
+
+    selected = st.session_state[selected_key]
+    selected_row = df[df["id"] == selected].iloc[0]
+    st.subheader(f"Artist stats: {selected_row['name']}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Plays", f"{int(selected_row['plays'])}")
+    with c2:
+        st.metric("Hours played", f"{float(selected_row['minutes']) / 60:.1f}")
+    with c3:
+        last = pd.to_datetime(selected_row["last_played"], utc=True, errors="coerce")
+        days = max(0, int((now - last).days)) if not pd.isna(last) else "-"
+        st.metric("Last played", f"{days}d ago" if days != "-" else "Unknown")
+
+    trend = artist_daily_trend(selected, _to_analytics_range(date_range))
+    if not trend.empty:
+        fig = px.line(trend, x="day", y="minutes", markers=True, title="Artist trend over time")
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def _render_songs(date_range: DateRange) -> None:
     st.title("Songs")
-    query = st.text_input("Search songs")
+    st.caption("Pick a song card to see detailed stats.")
     page = st.number_input("Page ", min_value=1, value=1, step=1)
-    df = top_songs(_to_analytics_range(date_range), search=query, pagination=Pagination(limit=50, offset=(page - 1) * 50))
+    df = top_songs(_to_analytics_range(date_range), pagination=Pagination(limit=60, offset=(page - 1) * 60))
     if df.empty:
         empty_state("No song results.")
         return
-    st.dataframe(df, use_container_width=True)
-    selected = st.selectbox("Song drill-down", options=df["id"].tolist(), format_func=lambda x: df[df["id"] == x]["name"].iloc[0])
+    selected_key = "library_songs_selected"
+    song_ids = df["id"].astype(str).tolist()
+    if st.session_state.get(selected_key) not in song_ids:
+        st.session_state[selected_key] = song_ids[0]
+
+    now = pd.Timestamp.now(tz=UTC)
+    cols = st.columns(3)
+    for idx, row in enumerate(df.itertuples(index=False), start=0):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{row.name}**")
+                st.caption(f"{row.artists or 'Unknown artist'}")
+                st.caption(f"Album: {row.album_name or 'Unknown album'}")
+                last_played = pd.to_datetime(row.last_played, utc=True, errors="coerce")
+                days_ago = max(0, int((now - last_played).days)) if not pd.isna(last_played) else "-"
+                st.write(f"Plays: **{int(row.plays)}**")
+                st.write(f"Hours played: **{float(row.minutes) / 60:.1f} h**")
+                st.caption(f"Last played: {days_ago} days ago" if days_ago != "-" else "Last played: unknown")
+                if st.button("View stats", key=f"song_card_{row.id}", use_container_width=True):
+                    st.session_state[selected_key] = str(row.id)
+
+    selected = st.session_state[selected_key]
+    selected_row = df[df["id"] == selected].iloc[0]
+    st.subheader(f"Song stats: {selected_row['name']}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Plays", f"{int(selected_row['plays'])}")
+    with c2:
+        st.metric("Hours played", f"{float(selected_row['minutes']) / 60:.1f}")
+    with c3:
+        avg_minutes = float(selected_row["minutes"]) / max(int(selected_row["plays"]), 1)
+        st.metric("Avg minutes per play", f"{avg_minutes:.2f}")
+
     trend = song_daily_trend(selected, _to_analytics_range(date_range))
     if not trend.empty:
         fig = px.line(trend, x="day", y="minutes", markers=True, title="Song trend over time")
@@ -355,14 +433,40 @@ def _render_songs(date_range: DateRange) -> None:
 
 def _render_albums(date_range: DateRange) -> None:
     st.title("Albums")
-    query = st.text_input("Search albums")
+    st.caption("Pick an album card to see detailed stats.")
     page = st.number_input("Page  ", min_value=1, value=1, step=1)
-    df = top_albums(_to_analytics_range(date_range), search=query, pagination=Pagination(limit=50, offset=(page - 1) * 50))
+    df = top_albums(_to_analytics_range(date_range), pagination=Pagination(limit=60, offset=(page - 1) * 60))
     if df.empty:
         empty_state("No album results.")
         return
-    st.dataframe(df, use_container_width=True)
-    selected = st.selectbox("Album drill-down", options=df["id"].tolist(), format_func=lambda x: df[df["id"] == x]["name"].iloc[0])
+    selected_key = "library_albums_selected"
+    album_ids = df["id"].astype(str).tolist()
+    if st.session_state.get(selected_key) not in album_ids:
+        st.session_state[selected_key] = album_ids[0]
+
+    now = pd.Timestamp.now(tz=UTC)
+    cols = st.columns(3)
+    for idx, row in enumerate(df.itertuples(index=False), start=0):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{row.name}**")
+                last_played = pd.to_datetime(row.last_played, utc=True, errors="coerce")
+                days_ago = max(0, int((now - last_played).days)) if not pd.isna(last_played) else "-"
+                st.write(f"Plays: **{int(row.plays)}**")
+                st.write(f"Hours played: **{float(row.minutes) / 60:.1f} h**")
+                st.caption(f"Last played: {days_ago} days ago" if days_ago != "-" else "Last played: unknown")
+                if st.button("View stats", key=f"album_card_{row.id}", use_container_width=True):
+                    st.session_state[selected_key] = str(row.id)
+
+    selected = st.session_state[selected_key]
+    selected_row = df[df["id"] == selected].iloc[0]
+    st.subheader(f"Album stats: {selected_row['name']}")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Plays", f"{int(selected_row['plays'])}")
+    with c2:
+        st.metric("Hours played", f"{float(selected_row['minutes']) / 60:.1f}")
+
     trend = album_daily_trend(selected, _to_analytics_range(date_range))
     if not trend.empty:
         fig = px.line(trend, x="day", y="minutes", markers=True, title="Album trend over time")
@@ -371,14 +475,39 @@ def _render_albums(date_range: DateRange) -> None:
 
 def _render_genres(date_range: DateRange) -> None:
     st.title("Genres")
+    st.caption("Pick a genre card to see detailed stats.")
     df = top_genres(_to_analytics_range(date_range), pagination=Pagination(limit=200))
     if df.empty:
         empty_state("No genres found. Run Spotify sync to fetch artist genres.")
         return
-    st.dataframe(df, use_container_width=True)
-    fig = px.bar(df.head(20), x="minutes", y="name", orientation="h", title="Genre ranking")
-    fig.update_layout(yaxis={"categoryorder": "total ascending"})
-    st.plotly_chart(fig, use_container_width=True)
+
+    selected_key = "library_genres_selected"
+    genre_names = df["name"].astype(str).tolist()
+    if st.session_state.get(selected_key) not in genre_names:
+        st.session_state[selected_key] = genre_names[0]
+
+    cols = st.columns(3)
+    total_minutes = float(df["minutes"].sum() or 0.0)
+    for idx, row in enumerate(df.itertuples(index=False), start=0):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{row.name}**")
+                st.write(f"Plays: **{int(row.plays)}**")
+                st.write(f"Hours played: **{float(row.minutes) / 60:.1f} h**")
+                if st.button("View stats", key=f"genre_card_{row.name}", use_container_width=True):
+                    st.session_state[selected_key] = str(row.name)
+
+    selected = st.session_state[selected_key]
+    selected_row = df[df["name"] == selected].iloc[0]
+    st.subheader(f"Genre stats: {selected}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Plays", f"{int(selected_row['plays'])}")
+    with c2:
+        st.metric("Hours played", f"{float(selected_row['minutes']) / 60:.1f}")
+    with c3:
+        share = (float(selected_row["minutes"]) / total_minutes * 100) if total_minutes else 0.0
+        st.metric("Share of listening", f"{share:.1f}%")
 
 
 def _render_diversity(date_range: DateRange) -> None:
